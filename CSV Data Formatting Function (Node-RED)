@@ -1,0 +1,105 @@
+The following JavaScript code is implemented inside a Node-RED Function node. Its purpose is to transform parsed CSV data into a structured format compatible with InfluxDB, enabling historical data replay as time-series data for live visualization in Grafana.
+
+Purpose of the Function Node
+
+Convert CSV string values into numeric data types
+
+Filter out invalid or missing values
+
+Map machine parameters to InfluxDB fields
+
+Assign measurement name, tags, and timestamp
+
+Prepare the message for the InfluxDB output node
+
+Function Node Implementation
+
+// This code must be placed inside a Node-RED Function node.
+
+// helper: turn string -> number, or return null if bad
+function toNum(v) {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+}
+
+// make sure we actually got an object from the CSV node
+if (!msg.payload || typeof msg.payload !== "object") {
+    // ignore this message
+    return null;
+}
+
+const p = msg.payload;
+
+// build fields (add/remove based on your CSV columns)
+const fields = {
+    aapower: toNum(p.aapower),
+    cmdfeedrate: toNum(p.cmdfeedrate),
+    aaacc: toNum(p.aaacc),
+    vacurr: toNum(p.vacurr),
+    vatorque: toNum(p.vatorque),
+    actfeedrate: toNum(p.actfeedrate),
+    actspeedrel: toNum(p.actspeedrel),
+    aacurr: toNum(p.aacurr),
+    aatorque: toNum(p.aatorque),
+    aaload: toNum(p.aaload),
+    vapower: toNum(p.vapower),
+    vaload: toNum(p.vaload),
+    aapowersmooth: toNum(p.aapowersmooth),
+    measposdev: toNum(p.measposdev),
+    valagerror: toNum(p.valagerror),
+    toolbaserepos: toNum(p.toolbaserepos),
+    driveload: toNum(p.driveload),
+    cmdspeed: toNum(p.cmdspeed),
+    actspeed: toNum(p.actspeed),
+    acttoolbasepos: toNum(p.acttoolbasepos),
+    systimeudword: toNum(p.systimeudword)
+};
+
+// remove null fields
+for (const k of Object.keys(fields)) {
+    if (fields[k] === null) {
+        delete fields[k];
+    }
+}
+
+// if nothing left, drop it
+if (Object.keys(fields).length === 0) {
+    return null;
+}
+
+// set measurement and tags for influxdb out
+msg.measurement = "grinding_machine";
+msg.tags = {
+    machine: "Ultrasonic40",
+    source: "csv_replay"
+};
+msg.payload = fields;
+
+// keep original timestamp
+msg.ts = p.ts;
+
+return msg;
+
+Explanation of Key Steps
+
+Type Conversion:
+The helper function ensures all CSV values are converted from strings to valid numerical values before storage.
+
+Data Validation:
+Invalid or missing values are automatically removed to prevent corrupt data points from entering InfluxDB.
+
+Field Mapping:
+Each machine parameter (power, torque, speed, feed rate, load, etc.) is mapped to an InfluxDB field.
+
+Measurement & Tags:
+
+Measurement: grinding_machine
+
+Tags: machine identifier and data source (csv_replay)
+
+Timestamp Preservation:
+The original timestamp from the CSV file is preserved to maintain correct time alignment during replay.
+
+Outcome
+
+This Function node ensures that historical machine data is cleanly transformed into valid time-series data and can be ingested into InfluxDB in the same format as live OPC UA data. As a result, Grafana dashboards can display replayed data as if it were streaming live from the machine.
